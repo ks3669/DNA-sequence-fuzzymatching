@@ -32,3 +32,8 @@ This helps simulate biological mutations and test the accuracy of DNA sequence m
 For ProblemC, the program performs a large-scale search for 36-mers in 100K, 10M, and 100M-character segments.
 It times the execution speed for querying the dataset and reports the number of matching sequences.
 This evaluates the scalability of the Trie structure in handling massive genomic data.
+
+7️⃣ Command-Line Interface & Execution Control
+The program is CLI-driven, taking input arguments for query path, subject dataset, problem type, and number of sequences.
+It supports different execution modes (ProblemA, ProblemB, ProblemC) based on user selection.
+Error handling is included to validate file paths, dataset formats, and problem type selection
