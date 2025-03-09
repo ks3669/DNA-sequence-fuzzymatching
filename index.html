@@ -98,235 +98,242 @@
         </div>
     </div>
 
-    <script>
-        const SEQUENCE_LENGTH = 36;
-        const DATASET_SIZE = 1000;
-        let trie = new GenomeTrie();
+<script>
+    const SEQUENCE_LENGTH = 36;
+    const DATASET_SIZE = 1000;
+    let trie = new GenomeTrie();
+    let sequencesDataset = []; // Store all generated sequences
 
-        // Generate random dataset on page load
-        window.onload = function() {
-            generateRandomDataset();
+    // ================== TRIE IMPLEMENTATION ================== //
+    class TrieNode {
+        constructor() {
+            this.children = {};
+            this.isEnd = false;
+        }
+    }
+
+    class GenomeTrie {
+        constructor() {
+            this.root = new TrieNode();
         }
 
-        function generateRandomDataset() {
-            for (let i = 0; i < DATASET_SIZE; i++) {
-                let sequence = generateRandomSequence();
-                trie.insertSequence(sequence);
-            }
-        }
-
-        function generateRandomSequence() {
-            const bases = ['A', 'C', 'G', 'T'];
-            let sequence = '';
-            for (let i = 0; i < SEQUENCE_LENGTH; i++) {
-                sequence += bases[Math.floor(Math.random() * 4)];
-            }
-            return sequence;
-        }
-
-        class TrieNode {
-            constructor() {
-                this.children = {};
-                this.isEnd = false;
-            }
-        }
-
-        class GenomeTrie {
-            constructor() {
-                this.root = new TrieNode();
-            }
-
-            insertSequence(sequence) {
-                let node = this.root;
-                for (const base of sequence) {
-                    if (!node.children[base]) {
-                        node.children[base] = new TrieNode();
-                    }
-                    node = node.children[base];
+        insertSequence(sequence) {
+            let node = this.root;
+            for (const base of sequence) {
+                if (!node.children[base]) {
+                    node.children[base] = new TrieNode();
                 }
-                node.isEnd = true;
+                node = node.children[base];
             }
+            node.isEnd = true;
+        }
 
-            searchSequence(sequence) {
-                return this.searchWithMismatches(this.root, sequence, 0, 0);
-            }
+        searchSequence(sequence) {
+            return this.searchWithMismatches(this.root, sequence, 0, 0);
+        }
 
-            searchWithMismatches(node, sequence, index, mismatches) {
-                if (!node) return false;
-                if (index === sequence.length) return node.isEnd && mismatches <= 1;
+        searchWithMismatches(node, sequence, index, mismatches) {
+            if (!node) return false;
+            if (index === sequence.length) return node.isEnd && mismatches <= 1;
 
-                const currentBase = sequence[index];
-                let found = false;
+            const currentBase = sequence[index];
+            let found = false;
 
-                for (const [base, childNode] of Object.entries(node.children)) {
-                    const newMismatches = mismatches + (base === currentBase ? 0 : 1);
-                    if (newMismatches <= 1) {
-                        found = this.searchWithMismatches(childNode, sequence, index + 1, newMismatches);
-                        if (found) break;
-                    }
+            for (const [base, childNode] of Object.entries(node.children)) {
+                const newMismatches = mismatches + (base === currentBase ? 0 : 1);
+                if (newMismatches <= 1) {
+                    found = this.searchWithMismatches(childNode, sequence, index + 1, newMismatches);
+                    if (found) break;
                 }
-
-                return found;
             }
+            return found;
+        }
+    }
+
+    // ================== DATA GENERATION ================== //
+    function generateRandomSequence() {
+        const bases = ['A', 'C', 'G', 'T'];
+        let sequence = '';
+        for (let i = 0; i < SEQUENCE_LENGTH; i++) {
+            sequence += bases[Math.floor(Math.random() * 4)];
+        }
+        return sequence;
+    }
+
+    function generateRandomDataset() {
+        sequencesDataset = []; // Reset dataset
+        for (let i = 0; i < DATASET_SIZE; i++) {
+            let sequence = generateRandomSequence();
+            sequencesDataset.push(sequence);
+            trie.insertSequence(sequence);
+        }
+        updateVisualization();
+    }
+
+    // ================== SEQUENCE ANALYSIS ================== //
+    function analyzeSequence() {
+        const input = document.getElementById('dnaInput').value.toUpperCase();
+        if (!/^[ACGT]{36}$/.test(input)) {
+            alert('Please enter a valid 36-character DNA sequence (only A, C, G, T allowed)');
+            return;
         }
 
-        function analyzeSequence() {
-            const input = document.getElementById('dnaInput').value.toUpperCase();
-            if (!/^[ACGT]{36}$/.test(input)) {
-                alert('Please enter a valid 36-character DNA sequence (only A, C, G, T allowed)');
-                return;
+        // Compare against all sequences
+        let exactMatches = 0;
+        let partialMatches = 0;
+
+        sequencesDataset.forEach(sequence => {
+            if (sequence === input) {
+                exactMatches++;
+            } else if (countMismatches(sequence, input) === 1) {
+                partialMatches++;
             }
-
-            const result = trie.searchSequence(input);
-            updateResults(result);
-        }
-
-        function updateResults(matchResult) {
-            document.getElementById('results').classList.remove('hidden');
-            
-            // Simulate finding matches in dataset (replace with actual trie search)
-            const exactMatches = Math.floor(Math.random() * 50); // Simulated data
-            const partialMatches = Math.floor(Math.random() * 30); // Simulated data
-            
-            // Animate results
-            animateValue('exactCount', 0, exactMatches, 1000);
-            animateValue('partialCount', 0, partialMatches, 1000);
-            animateBar('exactBar', exactMatches);
-            animateBar('partialBar', partialMatches);
-        }
-
-        function animateValue(elementId, start, end, duration) {
-            const element = document.getElementById(elementId);
-            let startTimestamp = null;
-            const step = (timestamp) => {
-                if (!startTimestamp) startTimestamp = timestamp;
-                const progress = Math.min((timestamp - startTimestamp) / duration, 1);
-                element.textContent = Math.floor(progress * (end - start) + start);
-                if (progress < 1) {
-                    window.requestAnimationFrame(step);
-                }
-            };
-            window.requestAnimationFrame(step);
-        }
-
-        function animateBar(elementId, count) {
-            const percentage = (count / DATASET_SIZE) * 100;
-            const bar = document.getElementById(elementId);
-            bar.style.width = Math.min(percentage, 100) + '%';
-        }
-
-        // ================== TRIE VISUALIZATION CODE ================== //
-let svg, simulation;
-const width = 1200, height = 500;
-
-function initVisualization() {
-    svg = d3.select("#visualization")
-        .append("svg")
-        .attr("width", width)
-        .attr("height", height)
-        .attr("viewBox", [-width / 2, -height / 2, width, height]);
-
-    simulation = d3.forceSimulation()
-        .force("link", d3.forceLink().id(d => d.id).distance(80))
-        .force("charge", d3.forceManyBody().strength(-300))
-        .force("center", d3.forceCenter(0, 0))
-        .force("collision", d3.forceCollide().radius(40));
-}
-
-function updateVisualization() {
-    const { nodes, links } = trieToGraph(trie.root);
-    
-    const link = svg.selectAll(".link")
-        .data(links)
-        .join("line")
-        .attr("class", "link");
-
-    const node = svg.selectAll(".node")
-        .data(nodes)
-        .join("g")
-        .attr("class", "node")
-        .call(drag(simulation));
-
-    node.append("circle")
-        .attr("r", 20)
-        .on("mouseover", function() {
-            d3.select(this).transition().attr("r", 24);
-        })
-        .on("mouseout", function() {
-            d3.select(this).transition().attr("r", 20);
         });
 
-    node.append("text")
-        .text(d => d.base || "root");
-
-    simulation.nodes(nodes);
-    simulation.force("link").links(links);
-    simulation.alpha(1).restart();
-
-    simulation.on("tick", () => {
-        link.attr("x1", d => d.source.x)
-            .attr("y1", d => d.source.y)
-            .attr("x2", d => d.target.x)
-            .attr("y2", d => d.target.y);
-
-        node.attr("transform", d => `translate(${d.x},${d.y})`);
-    });
-}
-
-function trieToGraph(root, nodes = [], links = [], parentId = null, depth = 0) {
-    const id = nodes.length.toString();
-    nodes.push({ id, base: depth === 0 ? "root" : Object.keys(root.children)[0], depth });
-    
-    if (parentId !== null) {
-        links.push({ source: parentId, target: id });
+        updateResults(exactMatches, partialMatches);
     }
 
-    for (const [base, child] of Object.entries(root.children)) {
-        trieToGraph(child, nodes, links, id, depth + 1);
+    function countMismatches(a, b) {
+        let mismatches = 0;
+        for (let i = 0; i < a.length; i++) {
+            if (a[i] !== b[i]) mismatches++;
+        }
+        return mismatches;
     }
 
-    return { nodes, links };
-}
-
-function drag(simulation) {
-    function dragstarted(event, d) {
-        if (!event.active) simulation.alphaTarget(0.3).restart();
-        d.fx = d.x;
-        d.fy = d.y;
+    // ================== RESULTS DISPLAY ================== //
+    function updateResults(exactMatches, partialMatches) {
+        document.getElementById('results').classList.remove('hidden');
+        
+        // Animate with real counts
+        animateValue('exactCount', 0, exactMatches, 1000);
+        animateValue('partialCount', 0, partialMatches, 1000);
+        animateBar('exactBar', exactMatches);
+        animateBar('partialBar', partialMatches);
     }
 
-    function dragged(event, d) {
-        d.fx = event.x;
-        d.fy = event.y;
+    function animateValue(elementId, start, end, duration) {
+        const element = document.getElementById(elementId);
+        let startTimestamp = null;
+        const step = (timestamp) => {
+            if (!startTimestamp) startTimestamp = timestamp;
+            const progress = Math.min((timestamp - startTimestamp) / duration, 1);
+            element.textContent = Math.floor(progress * (end - start) + start);
+            if (progress < 1) {
+                window.requestAnimationFrame(step);
+            }
+        };
+        window.requestAnimationFrame(step);
     }
 
-    function dragended(event, d) {
-        if (!event.active) simulation.alphaTarget(0);
-        d.fx = null;
-        d.fy = null;
+    function animateBar(elementId, count) {
+        const percentage = (count / DATASET_SIZE) * 100;
+        const bar = document.getElementById(elementId);
+        bar.style.width = Math.min(percentage, 100) + '%';
     }
 
-    return d3.drag()
-        .on("start", dragstarted)
-        .on("drag", dragged)
-        .on("end", dragended);
-}
+    // ================== TRIE VISUALIZATION ================== //
+    let svg, simulation;
+    const width = 1200, height = 500;
 
-// Modify existing generateRandomDataset
-function generateRandomDataset() {
-    for (let i = 0; i < DATASET_SIZE; i++) {
-        let sequence = generateRandomSequence();
-        trie.insertSequence(sequence);
+    function initVisualization() {
+        svg = d3.select("#visualization")
+            .append("svg")
+            .attr("width", width)
+            .attr("height", height)
+            .attr("viewBox", [-width / 2, -height / 2, width, height]);
+
+        simulation = d3.forceSimulation()
+            .force("link", d3.forceLink().id(d => d.id).distance(80))
+            .force("charge", d3.forceManyBody().strength(-300))
+            .force("center", d3.forceCenter(0, 0))
+            .force("collision", d3.forceCollide().radius(40));
     }
-    updateVisualization(); // Add this line
-}
 
-// Initialize visualization on load
-window.onload = function() {
-    initVisualization(); // Add this line
-    generateRandomDataset();
-}
-// ================== END VISUALIZATION CODE ================== //
-    </script>
+    function updateVisualization() {
+        const { nodes, links } = trieToGraph(trie.root);
+        
+        const link = svg.selectAll(".link")
+            .data(links)
+            .join("line")
+            .attr("class", "link");
+
+        const node = svg.selectAll(".node")
+            .data(nodes)
+            .join("g")
+            .attr("class", "node")
+            .call(drag(simulation));
+
+        node.append("circle")
+            .attr("r", 20)
+            .on("mouseover", function() {
+                d3.select(this).transition().attr("r", 24);
+            })
+            .on("mouseout", function() {
+                d3.select(this).transition().attr("r", 20);
+            });
+
+        node.append("text")
+            .text(d => d.base || "root");
+
+        simulation.nodes(nodes);
+        simulation.force("link").links(links);
+        simulation.alpha(1).restart();
+
+        simulation.on("tick", () => {
+            link.attr("x1", d => d.source.x)
+                .attr("y1", d => d.source.y)
+                .attr("x2", d => d.target.x)
+                .attr("y2", d => d.target.y);
+
+            node.attr("transform", d => `translate(${d.x},${d.y})`);
+        });
+    }
+
+    function trieToGraph(root, nodes = [], links = [], parentId = null, depth = 0) {
+        const id = nodes.length.toString();
+        nodes.push({ id, base: depth === 0 ? "root" : Object.keys(root.children)[0], depth });
+        
+        if (parentId !== null) {
+            links.push({ source: parentId, target: id });
+        }
+
+        for (const [base, child] of Object.entries(root.children)) {
+            trieToGraph(child, nodes, links, id, depth + 1);
+        }
+
+        return { nodes, links };
+    }
+
+    function drag(simulation) {
+        function dragstarted(event, d) {
+            if (!event.active) simulation.alphaTarget(0.3).restart();
+            d.fx = d.x;
+            d.fy = d.y;
+        }
+
+        function dragged(event, d) {
+            d.fx = event.x;
+            d.fy = event.y;
+        }
+
+        function dragended(event, d) {
+            if (!event.active) simulation.alphaTarget(0);
+            d.fx = null;
+            d.fy = null;
+        }
+
+        return d3.drag()
+            .on("start", dragstarted)
+            .on("drag", dragged)
+            .on("end", dragended);
+    }
+
+    // Initialize everything on page load
+    window.onload = function() {
+        initVisualization();
+        generateRandomDataset();
+    }
+</script>
 </body>
 </html>
