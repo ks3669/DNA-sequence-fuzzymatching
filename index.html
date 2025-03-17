@@ -1,362 +1,256 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-  <script src="https://d3js.org/d3.v7.min.js"></script>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>DNA Sequence Matcher</title>
-  <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
-  <style>
-    .node circle {
-      fill: #4CAF50;
-      stroke: #2E7D32;
-      stroke-width: 2px;
-      transition: all 0.3s ease;
-    }
-    .node text {
-      font: 14px monospace;
-      fill: white;
-      text-anchor: middle;
-      dominant-baseline: central;
-    }
-    .link {
-      stroke: #666;
-      stroke-opacity: 0.6;
-      stroke-width: 1.5px;
-    }
-    .node:hover circle {
-      fill: #FFC107;
-      stroke: #FFA000;
-      transform: scale(1.2);
-    }
-    .node:hover text {
-      fill: #FFC107;
-    }
-    #visualization {
-      border: 2px solid #374151;
-      border-radius: 8px;
-      background: #1F2937;
-      margin-top: 2rem;
-      overflow: hidden; /* ensure containment */
-    }
-    .match-bar {
-      transition: width 0.5s ease-in-out;
-    }
-    .dna-base {
-      display: inline-block;
-      width: 20px;
-      text-align: center;
-      font-family: monospace;
-    }
-    .match { background-color: #4CAF50; }
-    .partial { background-color: #FFC107; }
-    .mismatch { background-color: #f44336; }
-  </style>
-</head>
-<body class="bg-gray-900 min-h-screen text-gray-100">
-  <div class="container mx-auto px-4 py-8 max-w-4xl">
-    <h1 class="text-4xl font-bold mb-6 text-transparent bg-clip-text bg-gradient-to-r from-green-400 to-blue-500">
-      DNA Sequence Matcher
-    </h1>
-    <div class="bg-gray-800 rounded-lg p-6 shadow-xl mb-8">
-      <div class="mb-4">
-        <label class="block mb-2 text-lg">Enter DNA Sequence (36 characters):</label>
-        <input type="text" id="dnaInput" class="w-full px-4 py-2 bg-gray-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500" maxlength="36" placeholder="e.g., ACGTGTCACAGT...">
-      </div>
-      <button onclick="analyzeSequence()" class="px-6 py-2 bg-green-600 hover:bg-green-700 rounded-lg transition-colors duration-200">
-        Analyze Sequence
-      </button>
-    </div>
+<script>
+  // Constants
+  const SEQUENCE_LENGTH = 36;
+  const DATASET_SIZE = 100;
 
-    <!-- Loading Spinner -->
-    <div id="loadingSpinner" class="hidden flex justify-center items-center mb-4">
-      <svg class="animate-spin h-8 w-8 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
-      </svg>
-    </div>
-
-    <div id="results" class="hidden">
-      <div class="bg-gray-800 rounded-lg p-6 shadow-xl mb-6">
-        <h2 class="text-2xl font-bold mb-4">Match Results</h2>
-        <div class="container mx-auto px-4 py-8 max-w-6xl">
-          <div id="visualization" class="w-full h-96"></div>
-        </div>
-        <div class="grid grid-cols-2 gap-4 mb-6">
-          <div class="bg-gray-700 p-4 rounded-lg">
-            <div class="text-green-400 font-bold text-xl">Exact Matches</div>
-            <div id="exactCount" class="text-3xl my-2">0</div>
-            <div class="w-full bg-gray-600 rounded-full h-2">
-              <div id="exactBar" class="match-bar h-2 rounded-full bg-green-500" style="width: 0%"></div>
-            </div>
-          </div>
-          <div class="bg-gray-700 p-4 rounded-lg">
-            <div class="text-yellow-400 font-bold text-xl">Partial Matches (Score ≥ 10)</div>
-            <div id="partialCount" class="text-3xl my-2">0</div>
-            <div class="w-full bg-gray-600 rounded-full h-2">
-              <div id="partialBar" class="match-bar h-2 rounded-full bg-yellow-500" style="width: 0%"></div>
-            </div>
-          </div>
-        </div>
-      </div>
-      <div class="bg-gray-800 rounded-lg p-6 shadow-xl mb-6">
-        <h2 class="text-2xl font-bold mb-4">Sorted Match List</h2>
-        <div id="matchList" class="space-y-2 max-h-64 overflow-y-auto"></div>
-      </div>
-    </div>
-  </div>
-
-  <script>
-    // Constants
-    const SEQUENCE_LENGTH = 36;
-    const DATASET_SIZE = 100;
-
-    // Define classes first
-    class TrieNode {
-      constructor() {
-        this.children = {};
-        this.isEnd = false;
-      }
+  // Define classes first
+  class TrieNode {
+    constructor() {
+      this.children = {};
+      this.isEnd = false;
     }
+  }
 
-    class GenomeTrie {
-      constructor() {
-        this.root = new TrieNode();
-      }
-      insertSequence(sequence) {
-        let node = this.root;
-        for (const base of sequence) {
-          if (!node.children[base]) {
-            node.children[base] = new TrieNode();
-          }
-          node = node.children[base];
+  class GenomeTrie {
+    constructor() {
+      this.root = new TrieNode();
+    }
+    insertSequence(sequence) {
+      let node = this.root;
+      for (const base of sequence) {
+        if (!node.children[base]) {
+          node.children[base] = new TrieNode();
         }
-        node.isEnd = true;
+        node = node.children[base];
       }
+      node.isEnd = true;
     }
+  }
 
-    // Global variables
-    let trie = new GenomeTrie();
-    let sequencesDataset = []; // Store all generated sequences
+  // Declare global variables that depend on the classes
+  let trie = new GenomeTrie();
+  let sequencesDataset = []; // Store all generated sequences
 
-    // ================== DATA GENERATION ================== //
-    function generateRandomSequence() {
-      const bases = ['A', 'C', 'G', 'T'];
-      let sequence = '';
-      for (let i = 0; i < SEQUENCE_LENGTH; i++) {
-        sequence += bases[Math.floor(Math.random() * 4)];
-      }
-      return sequence;
+  // ================== DATA GENERATION ================== //
+  function generateRandomSequence() {
+    const bases = ['A', 'C', 'G', 'T'];
+    let sequence = '';
+    for (let i = 0; i < SEQUENCE_LENGTH; i++) {
+      sequence += bases[Math.floor(Math.random() * 4)];
     }
+    return sequence;
+  }
 
-    function generateRandomDataset() {
-      sequencesDataset = []; // Reset dataset
-      trie = new GenomeTrie(); // Reset trie for visualization
-      for (let i = 0; i < DATASET_SIZE; i++) {
-        let sequence = generateRandomSequence();
-        sequencesDataset.push(sequence);
-        trie.insertSequence(sequence);
-      }
-      updateVisualization();
+  function generateRandomDataset() {
+    sequencesDataset = []; // Reset dataset
+    trie = new GenomeTrie(); // Reset trie for visualization
+    for (let i = 0; i < DATASET_SIZE; i++) {
+      let sequence = generateRandomSequence();
+      sequencesDataset.push(sequence);
+      trie.insertSequence(sequence);
     }
+    updateVisualization();
+  }
 
-    // ================== FUZZY MATCHING ALGORITHM ================== //
-    // Computes the length of the longest common contiguous substring between two sequences.
-    function longestCommonSubstringLength(s1, s2) {
-      let maxLen = 0;
-      let dp = [];
-      for (let i = 0; i <= s1.length; i++) {
-        dp[i] = Array(s2.length + 1).fill(0);
-      }
-      for (let i = 1; i <= s1.length; i++) {
-        for (let j = 1; j <= s2.length; j++) {
-          if (s1[i - 1] === s2[j - 1]) {
-            dp[i][j] = dp[i - 1][j - 1] + 1;
-            if (dp[i][j] > maxLen) maxLen = dp[i][j];
-          } else {
-            dp[i][j] = 0;
-          }
-        }
-      }
-      return maxLen;
+  // ================== FUZZY MATCHING ALGORITHM ================== //
+  // Computes the length of the longest common contiguous substring between two sequences.
+  function longestCommonSubstringLength(s1, s2) {
+    let maxLen = 0;
+    let dp = [];
+    for (let i = 0; i <= s1.length; i++) {
+      dp[i] = Array(s2.length + 1).fill(0);
     }
-
-    // ================== SEQUENCE ANALYSIS ================== //
-    function analyzeSequence() {
-      console.log("Analyze function triggered.");
-      const input = document.getElementById('dnaInput').value.toUpperCase();
-      if (!/^[ACGT]{36}$/.test(input)) {
-        alert('Please enter a valid 36-character DNA sequence (only A, C, G, T allowed)');
-        return;
-      }
-      
-      // Unhide results and show spinner immediately
-      document.getElementById('results').classList.remove('hidden');
-      document.getElementById('loadingSpinner').classList.remove('hidden');
-
-      setTimeout(function() {
-        try {
-          console.log("Starting fuzzy matching...");
-          let resultsArray = [];
-          let exactMatches = 0;
-          let partialMatches = 0;
-          sequencesDataset.forEach(sequence => {
-            let score = longestCommonSubstringLength(sequence, input);
-            if (sequence === input) {
-              resultsArray.push({ sequence, score, type: "Exact" });
-              exactMatches++;
-            } else if (score >= 10) { // Only include partial matches with score ≥ 10
-              resultsArray.push({ sequence, score, type: "Partial" });
-              partialMatches++;
-            }
-          });
-          // Sort results in descending order of score (best matches first)
-          resultsArray.sort((a, b) => b.score - a.score);
-          console.log("Fuzzy matching complete.", resultsArray);
-          updateResults(exactMatches, partialMatches, resultsArray);
-        } catch (error) {
-          console.error("Error during matching:", error);
-        } finally {
-          // Hide spinner
-          document.getElementById('loadingSpinner').classList.add('hidden');
-        }
-      }, 100);
-    }
-
-    function updateResults(exactMatches, partialMatches, resultsArray) {
-      // Update counts and progress bars
-      animateValue('exactCount', 0, exactMatches, 1000);
-      animateValue('partialCount', 0, partialMatches, 1000);
-      animateBar('exactBar', exactMatches);
-      animateBar('partialBar', partialMatches);
-
-      // Update sorted match list
-      let matchListDiv = document.getElementById('matchList');
-      matchListDiv.innerHTML = '';
-      resultsArray.forEach(result => {
-        let matchDiv = document.createElement('div');
-        matchDiv.className = "p-2 border-b border-gray-600";
-        if (result.type === "Exact") {
-          matchDiv.innerHTML = `<strong>Exact</strong> - ${result.sequence} (Score: ${result.score})`;
+    for (let i = 1; i <= s1.length; i++) {
+      for (let j = 1; j <= s2.length; j++) {
+        if (s1[i - 1] === s2[j - 1]) {
+          dp[i][j] = dp[i - 1][j - 1] + 1;
+          if (dp[i][j] > maxLen) maxLen = dp[i][j];
         } else {
-          matchDiv.innerHTML = `<strong>Partial</strong> - ${result.sequence} (Score: ${result.score})`;
+          dp[i][j] = 0;
         }
-        matchListDiv.appendChild(matchDiv);
-      });
-    }
-
-    function animateValue(elementId, start, end, duration) {
-      const element = document.getElementById(elementId);
-      let startTimestamp = null;
-      const step = (timestamp) => {
-        if (!startTimestamp) startTimestamp = timestamp;
-        const progress = Math.min((timestamp - startTimestamp) / duration, 1);
-        element.textContent = Math.floor(progress * (end - start) + start);
-        if (progress < 1) {
-          window.requestAnimationFrame(step);
-        }
-      };
-      window.requestAnimationFrame(step);
-    }
-
-    function animateBar(elementId, count) {
-      const percentage = (count / DATASET_SIZE) * 100;
-      const bar = document.getElementById(elementId);
-      bar.style.width = Math.min(percentage, 100) + '%';
-    }
-
-    // ================== TRIE VISUALIZATION ================== //
-    let svg, simulation;
-    const width = 1200, height = 500;
-
-    function initVisualization() {
-      svg = d3.select("#visualization")
-              .append("svg")
-              .attr("width", width)
-              .attr("height", height)
-              .attr("viewBox", `0 0 ${width} ${height}`);
-      simulation = d3.forceSimulation()
-                     .force("link", d3.forceLink().id(d => d.id).distance(80))
-                     .force("charge", d3.forceManyBody().strength(-300))
-                     .force("center", d3.forceCenter(width / 2, height / 2))
-                     .force("collision", d3.forceCollide().radius(40));
-    }
-
-    function trieToGraph(node, nodes = [], links = [], parentId = null, depth = 0, letter = "root") {
-      const id = nodes.length.toString();
-      nodes.push({ id, base: letter, depth });
-      if (parentId !== null) {
-        links.push({ source: parentId, target: id });
       }
-      for (const [childLetter, childNode] of Object.entries(node.children)) {
-        trieToGraph(childNode, nodes, links, id, depth + 1, childLetter);
-      }
-      return { nodes, links };
     }
+    return maxLen;
+  }
 
-    function updateVisualization() {
-      const { nodes, links } = trieToGraph(trie.root);
-      const link = svg.selectAll(".link")
-                      .data(links)
-                      .join("line")
-                      .attr("class", "link");
-      const node = svg.selectAll(".node")
-                      .data(nodes)
-                      .join("g")
-                      .attr("class", "node")
-                      .call(drag(simulation));
-      // Clear existing circles and texts (if updating)
-      node.selectAll("circle").remove();
-      node.selectAll("text").remove();
-      node.append("circle")
-          .attr("r", 20)
-          .on("mouseover", function() {
-            d3.select(this).transition().attr("r", 24);
-          })
-          .on("mouseout", function() {
-            d3.select(this).transition().attr("r", 20);
-          });
-      node.append("text")
-          .text(d => d.base)
-          .attr("dy", ".35em");
-      simulation.nodes(nodes);
-      simulation.force("link").links(links);
-      simulation.alpha(1).restart();
-      simulation.on("tick", () => {
-        link.attr("x1", d => d.source.x)
-            .attr("y1", d => d.source.y)
-            .attr("x2", d => d.target.x)
-            .attr("y2", d => d.target.y);
-        node.attr("transform", d => `translate(${d.x},${d.y})`);
-      });
+  // ================== SEQUENCE ANALYSIS ================== //
+  function analyzeSequence() {
+    console.log("Analyze function triggered.");
+    const input = document.getElementById('dnaInput').value.toUpperCase();
+    if (!/^[ACGT]{36}$/.test(input)) {
+      alert('Please enter a valid 36-character DNA sequence (only A, C, G, T allowed)');
+      return;
     }
+    
+    // Unhide results and show spinner immediately
+    document.getElementById('results').classList.remove('hidden');
+    document.getElementById('loadingSpinner').classList.remove('hidden');
 
-    function drag(simulation) {
-      function dragstarted(event, d) {
-        if (!event.active) simulation.alphaTarget(0.3).restart();
-        d.fx = d.x;
-        d.fy = d.y;
+    setTimeout(function() {
+      try {
+        console.log("Starting fuzzy matching...");
+        let resultsArray = [];
+        let exactMatches = 0;
+        sequencesDataset.forEach(sequence => {
+          let score = longestCommonSubstringLength(sequence, input);
+          resultsArray.push({ sequence, score });
+          if (sequence === input) {
+            exactMatches++;
+          }
+        });
+        // Sort results in descending order of score (best matches first)
+        resultsArray.sort((a, b) => b.score - a.score);
+        console.log("Fuzzy matching complete.", resultsArray);
+        updateResults(exactMatches, resultsArray);
+      } catch (error) {
+        console.error("Error during matching:", error);
+      } finally {
+        // Hide spinner
+        document.getElementById('loadingSpinner').classList.add('hidden');
       }
-      function dragged(event, d) {
-        d.fx = event.x;
-        d.fy = event.y;
-      }
-      function dragended(event, d) {
-        if (!event.active) simulation.alphaTarget(0);
-        d.fx = null;
-        d.fy = null;
-      }
-      return d3.drag()
-               .on("start", dragstarted)
-               .on("drag", dragged)
-               .on("end", dragended);
-    }
+    }, 100);
+  }
 
-    // Initialize everything on page load
-    window.onload = function() {
-      initVisualization();
-      generateRandomDataset();
+  function updateResults(exactMatches, resultsArray) {
+    // Update counts and progress bars
+    animateValue('exactCount', 0, exactMatches, 1000);
+    animateValue('partialCount', 0, resultsArray.length - exactMatches, 1000);
+    animateBar('exactBar', exactMatches);
+    animateBar('partialBar', resultsArray.length - exactMatches);
+
+    // Update sorted match list
+    let matchListDiv = document.getElementById('matchList');
+    matchListDiv.innerHTML = '';
+    resultsArray.forEach(result => {
+      let matchDiv = document.createElement('div');
+      matchDiv.className = "p-2 border-b border-gray-600";
+      if (result.sequence === document.getElementById('dnaInput').value.toUpperCase()) {
+        matchDiv.innerHTML = `<strong>Exact</strong> - ${result.sequence} (Score: ${result.score})`;
+      } else {
+        matchDiv.innerHTML = `Partial - ${result.sequence} (Score: ${result.score})`;
+      }
+      matchListDiv.appendChild(matchDiv);
+    });
+  }
+
+  function animateValue(elementId, start, end, duration) {
+    const element = document.getElementById(elementId);
+    let startTimestamp = null;
+    const step = (timestamp) => {
+      if (!startTimestamp) startTimestamp = timestamp;
+      const progress = Math.min((timestamp - startTimestamp) / duration, 1);
+      element.textContent = Math.floor(progress * (end - start) + start);
+      if (progress < 1) {
+        window.requestAnimationFrame(step);
+      }
     };
-  </script>
-</body>
-</html>
+    window.requestAnimationFrame(step);
+  }
+
+  function animateBar(elementId, count) {
+    const percentage = (count / DATASET_SIZE) * 100;
+    const bar = document.getElementById(elementId);
+    bar.style.width = Math.min(percentage, 100) + '%';
+  }
+
+  // ================== TRIE VISUALIZATION ================== //
+  let svg, simulation;
+  const width = 1200, height = 500;
+
+  function initVisualization() {
+    svg = d3.select("#visualization")
+            .append("svg")
+            .attr("width", width)
+            .attr("height", height)
+            .attr("viewBox", [-width / 2, -height / 2, width, height]);
+
+    simulation = d3.forceSimulation()
+                   .force("link", d3.forceLink().id(d => d.id).distance(80))
+                   .force("charge", d3.forceManyBody().strength(-300))
+                   .force("center", d3.forceCenter(0, 0))
+                   .force("collision", d3.forceCollide().radius(40));
+  }
+
+  function trieToGraph(node, nodes = [], links = [], parentId = null, depth = 0, letter = "root") {
+    const id = nodes.length.toString();
+    nodes.push({ id, base: letter, depth });
+
+    if (parentId !== null) {
+      links.push({ source: parentId, target: id });
+    }
+    for (const [childLetter, childNode] of Object.entries(node.children)) {
+      trieToGraph(childNode, nodes, links, id, depth + 1, childLetter);
+    }
+    return { nodes, links };
+  }
+
+  function updateVisualization() {
+    const { nodes, links } = trieToGraph(trie.root);
+
+    const link = svg.selectAll(".link")
+                    .data(links)
+                    .join("line")
+                    .attr("class", "link");
+
+    const node = svg.selectAll(".node")
+                    .data(nodes)
+                    .join("g")
+                    .attr("class", "node")
+                    .call(drag(simulation));
+
+    node.append("circle")
+        .attr("r", 20)
+        .on("mouseover", function() {
+          d3.select(this).transition().attr("r", 24);
+        })
+        .on("mouseout", function() {
+          d3.select(this).transition().attr("r", 20);
+        });
+
+    node.append("text")
+        .text(d => d.base);
+
+    simulation.nodes(nodes);
+    simulation.force("link").links(links);
+    simulation.alpha(1).restart();
+
+    simulation.on("tick", () => {
+      link.attr("x1", d => d.source.x)
+          .attr("y1", d => d.source.y)
+          .attr("x2", d => d.target.x)
+          .attr("y2", d => d.target.y);
+
+      node.attr("transform", d => `translate(${d.x},${d.y})`);
+    });
+  }
+
+  function drag(simulation) {
+    function dragstarted(event, d) {
+      if (!event.active) simulation.alphaTarget(0.3).restart();
+      d.fx = d.x;
+      d.fy = d.y;
+    }
+
+    function dragged(event, d) {
+      d.fx = event.x;
+      d.fy = event.y;
+    }
+
+    function dragended(event, d) {
+      if (!event.active) simulation.alphaTarget(0);
+      d.fx = null;
+      d.fy = null;
+    }
+
+    return d3.drag()
+             .on("start", dragstarted)
+             .on("drag", dragged)
+             .on("end", dragended);
+  }
+
+  // Initialize everything on page load
+  window.onload = function() {
+    initVisualization();
+    generateRandomDataset();
+  };
+</script>
